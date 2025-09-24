@@ -1,14 +1,28 @@
 
+
 import { GoogleGenAI, Modality } from "@google/genai";
 import type { LineArtStyle, EditType, Resolution } from "../types";
 
-const API_KEY = process.env.API_KEY;
+// Safely access the API key in a browser environment.
+const API_KEY = typeof process !== 'undefined' && process.env ? process.env.API_KEY : undefined;
 
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable not set");
+// Gracefully handle missing API key without crashing the app on load.
+let ai: GoogleGenAI | null = null;
+if (API_KEY) {
+  ai = new GoogleGenAI({ apiKey: API_KEY });
+} else {
+  // Log an error for the developer, but don't throw, so the UI can still render.
+  console.error("API_KEY environment variable not set. AI features will be disabled.");
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+// A check function to be called before any API call.
+const checkAIService = () => {
+  if (!ai) {
+    // This error will be caught by the calling functions and displayed to the user.
+    throw new Error("خدمة الذكاء الاصطناعي غير مهيأة. يرجى التأكد من تكوين مفتاح API بشكل صحيح من قبل مسؤول الموقع.");
+  }
+};
+
 
 const resolutionPrompts: Record<Resolution, string> = {
     Low: "The output should be a low-resolution, simplified image with thick, bold lines. Focus on the main shapes and ignore fine details.",
@@ -30,9 +44,11 @@ const editPrompts: Record<EditType, string> = {
 };
 
 const callGeminiImageAPI = async (base64Image: string, mimeType: string, prompt: string): Promise<string> => {
+    checkAIService(); // Check if the AI service is initialized.
+
     let response;
     try {
-        response = await ai.models.generateContent({
+        response = await ai!.models.generateContent({
             model: 'gemini-2.5-flash-image-preview',
             contents: {
               parts: [
